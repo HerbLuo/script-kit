@@ -1,27 +1,22 @@
 package cn.cloudself.script;
 
 import cn.cloudself.query.QueryProSql;
+import cn.cloudself.script.util.LogFactory;
 import cn.cloudself.script.util.SpringUtil;
 import org.intellij.lang.annotations.Language;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
 
 public class CommonFunctionsForScript {
     public static CommonFunctionsForScript INSTANCE = new CommonFunctionsForScript();
-    private static final boolean isSlf4jPresent = isPresent("org.slf4j.Logger");
-    private static final Logger log = isSlf4jPresent ? LoggerFactory.getLogger(CommonFunctionsForScript.class) : null;
+
+    private static final LogFactory.Log log = LogFactory.getLog(CommonFunctionsForScript.class);
 
     protected CommonFunctionsForScript() { }
 
     public void log(String str) {
-        if (isSlf4jPresent) {
-            log.info(str);
-        } else {
-            print(str);
-        }
+        log.info(str);
     }
 
     public void print(Object obj) {

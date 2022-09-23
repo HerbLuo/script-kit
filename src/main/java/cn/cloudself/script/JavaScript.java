@@ -1,21 +1,32 @@
 package cn.cloudself.script;
 
+import cn.cloudself.script.util.LogFactory;
+import cn.cloudself.script.util.Ref;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.TypeLiteral;
 import org.graalvm.polyglot.Value;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.Arrays;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class JavaScript {
+
     public static String JavaFunctionName = "Jv_FN";
     public static boolean doesRuntimeCompilationSupported = false;
+
+    private static final ThreadLocal<Boolean> disableLog = ThreadLocal.withInitial(() -> false);
+    public static void disableLogThreadLocal(Boolean disable) {
+        disableLog.set(disable);
+    }
+
+    private static final LogFactory.Log log = LogFactory.getLog(CommonFunctionsForScript.class);
 
     private final Context.Builder builder = Context
             .newBuilder()
@@ -25,7 +36,7 @@ public class JavaScript {
     private final String functionsHelper;
 
     /**
-     * @param functions 公共方法
+     * @param functions 公共方法 参考CommonFunctionsForScript，也可以继承或扩展该类。
      */
     public JavaScript(Object functions) {
         this.functions = functions;
@@ -41,7 +52,11 @@ public class JavaScript {
         }
 
         /**
-         * @param vars 变量
+         * @param vars 变量 map
+         *             会自动将long范围内的BigDecimal转成double
+         *             会自动将long范围内的BigInteger转成long
+         *             如希望阻止该行为，使用<code>Ref.of(BigDecimal)</code>，js端直接使用<code>BigDecimal</code>的 <code>.add()</code><code>.subtract()</code>访问该对象
+         *
          * @return Java对象，如下表
          * <ul>
          *     <li><code><pre>undefined    -> null  </pre></code></li>
@@ -58,12 +73,21 @@ public class JavaScript {
             return eval(vars, this::toJavaObject);
         }
 
+        public Object eval() {
+            return eval(new HashMap<>(), this::toJavaObject);
+        }
+
         public <T> T eval(Map<String, ?> vars, Class<T> resultType) {
             return eval(vars, v -> v.as(resultType));
         }
 
+        /**
+         * 支持 new TypeLiteral<Map<String, Object>>() { }
+         * 但不支持 new TypeLiteral<HashMap<String, Object>>() { }
+         *
+         */
         public <T> T eval(Map<String, ?> vars, TypeLiteral<T> resultType) {
-            return eval(vars, v -> v.as(resultType));
+            return eval(vars, v ->  v.as(resultType));
         }
 
         private <T> T eval(Map<String, ?> vars, Function<Value, T> resultHandler) {
@@ -73,7 +97,24 @@ public class JavaScript {
                 if (vars != null) {
                     toJsObject(vars, bindings);
                 }
-                return resultHandler.apply(context.eval(source));
+                final Boolean d = disableLog.get();
+                if (!d) {
+                    log.info(source.getCharacters());
+                }
+                T result = resultHandler.apply(context.eval(source));
+                if (result instanceof List) {
+                    //noinspection unchecked
+                    result = (T) new ArrayList<>((List<?>) result);
+                }
+                if (result instanceof Map) {
+                    //noinspection unchecked
+                    result = (T) new HashMap<>((Map<?, ?>) result);
+                }
+
+                if (!d) {
+                    log.info("eval result: " + result);
+                }
+                return result;
             }
         }
 
@@ -81,6 +122,19 @@ public class JavaScript {
             for (Map.Entry<String, ?> entry : vars.entrySet()) {
                 final String key = entry.getKey();
                 Object value = entry.getValue();
+                if (value instanceof Ref<?>) {
+                    value = ((Ref<?>) value).getValue();
+                } else if (value instanceof BigDecimal) {
+                    final BigDecimal bigDecimal = (BigDecimal) value;
+                    if (bigDecimal.compareTo(maxLongValueBigDecimalView) < 0) {
+                        value = bigDecimal.doubleValue();
+                    }
+                } else if (value instanceof BigInteger) {
+                    final BigInteger bigInteger = (BigInteger) value;
+                    if (bigInteger.compareTo(maxLongValueBigIntegerView) < 0) {
+                        value = bigInteger.longValue();
+                    }
+                }
                 bindings.putMember(key, value);
             }
         }
@@ -126,10 +180,14 @@ public class JavaScript {
         } else {
             finalScriptBuilder.append(script);
         }
+        final String finalScript = finalScriptBuilder.toString();
         final Source source = Source
-                .newBuilder("js", finalScriptBuilder.toString(), null)
+                .newBuilder("js", finalScript, null)
                 .cached(cache)
                 .buildLiteral();
         return new Prepared(source);
     }
+
+    private final static BigInteger maxLongValueBigIntegerView = new BigInteger(String.valueOf(Long.MAX_VALUE));
+    private final static BigDecimal maxLongValueBigDecimalView = new BigDecimal(Long.MAX_VALUE);
 }

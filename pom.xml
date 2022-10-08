@@ -6,7 +6,7 @@
 
     <artifactId>script-kit</artifactId>
     <groupId>cn.cloudself</groupId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <packaging>jar</packaging>
 
     <name>script-kit</name>
@@ -75,7 +75,7 @@
         <dependency>
             <groupId>cn.cloudself</groupId>
             <artifactId>query-pro</artifactId>
-            <version>1.1.0</version>
+            <version>1.1.2</version>
             <optional>true</optional>
         </dependency>
         <dependency>

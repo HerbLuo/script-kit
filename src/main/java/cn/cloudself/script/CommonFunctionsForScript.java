@@ -15,7 +15,7 @@ public class CommonFunctionsForScript {
 
     protected CommonFunctionsForScript() { }
 
-    public void log(String str) {
+    public void log(Object str) {
         log.info(str);
     }
 

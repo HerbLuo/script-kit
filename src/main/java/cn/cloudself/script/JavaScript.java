@@ -6,6 +6,7 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.TypeLiteral;
 import org.graalvm.polyglot.Value;
+import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -66,19 +67,19 @@ public class JavaScript {
          *     <li><code><pre>{}           -> Map   </pre></code></li>
          *     <li><code><pre>new Date()   -> LocalDateTime </pre></code></li>
          *     <li><code><pre>function(){} -> Function      </pre></code></li>
-         *     <li><code><pre>[{}]         -> Map.get(0) instanceof Map</code></li>
+         *     <li><code><pre>[{}]         -> ArrayList.get(0) instanceof HashMap</code></li>
          * </ul>
          */
         public Object eval(Map<String, ?> vars) {
-            return eval(vars, this::toJavaObject);
+            return eval(vars.entrySet().iterator(), this::toJavaObject);
         }
 
         public Object eval() {
-            return eval(new HashMap<>(), this::toJavaObject);
+            return eval(Collections.emptyIterator(), this::toJavaObject);
         }
 
         public <T> T eval(Map<String, ?> vars, Class<T> resultType) {
-            return eval(vars, v -> v.as(resultType));
+            return eval(vars.entrySet().iterator(), v -> v.as(resultType));
         }
 
         /**
@@ -87,10 +88,14 @@ public class JavaScript {
          *
          */
         public <T> T eval(Map<String, ?> vars, TypeLiteral<T> resultType) {
+            return eval(vars.entrySet().iterator(), v ->  v.as(resultType));
+        }
+
+        public <T> T eval(Iterator<? extends Map.Entry<String, ?>> vars, TypeLiteral<T> resultType) {
             return eval(vars, v ->  v.as(resultType));
         }
 
-        private <T> T eval(Map<String, ?> vars, Function<Value, T> resultHandler) {
+        private <T> T eval(Iterator<? extends Map.Entry<String, ?>> vars, Function<Value, T> resultHandler) {
             try (final Context context = builder.build()) {
                 final Value bindings = context.getBindings("js");
                 bindings.putMember(JavaFunctionName, functions);
@@ -118,8 +123,9 @@ public class JavaScript {
             }
         }
 
-        private void toJsObject(Map<String, ?> vars, Value bindings) {
-            for (Map.Entry<String, ?> entry : vars.entrySet()) {
+        private void toJsObject(@NotNull Iterator<? extends Map.Entry<String, ?>> vars, Value bindings) {
+            while (vars.hasNext()) {
+                final Map.Entry<String, ?> entry = vars.next();
                 final String key = entry.getKey();
                 Object value = entry.getValue();
                 if (value instanceof Ref<?>) {

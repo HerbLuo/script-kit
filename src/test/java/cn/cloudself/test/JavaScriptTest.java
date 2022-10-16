@@ -46,4 +46,22 @@ public class JavaScriptTest {
         vars.put("date", new Date());
         System.out.println(compiled.eval(vars));
     }
+
+    @Test
+    public void t2() {
+//        final List<?> objects = new ArrayList<String>();
+//        objects.add("");
+//        objects.get(1);
+
+        final List<String> list = new ArrayList<>();
+
+        ((List) list).add(1);
+
+        System.out.println(list);
+
+        final Object s = list.get(0);
+        System.out.println(s);
+
+
+    }
 }

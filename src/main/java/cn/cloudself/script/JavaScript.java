@@ -7,6 +7,7 @@ import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.TypeLiteral;
 import org.graalvm.polyglot.Value;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -16,6 +17,7 @@ import java.time.LocalTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 public class JavaScript {
 
@@ -44,6 +46,78 @@ public class JavaScript {
         this.functionsHelper = Arrays.stream(functions.getClass().getDeclaredMethods())
             .map(jf -> "const " + jf.getName() + "=s=>" + JavaFunctionName + "." + jf.getName() + "(s);")
             .collect(Collectors.joining());
+    }
+
+    public class PreparedBatch {
+        private final String script;
+        private final String result;
+        private PreparedBatch(String script, String result) {
+            this.script = script;
+            this.result = result;
+        }
+
+        /**
+         * 例如 ofBatch("const a_number = 10;", "a + b * c - a_number")
+         *
+         * @param varNames a b c
+         * @param varsBatch JSON.parse([{a:1,b:2,c:3},{a:10,b:20,c:30}])  .map(vars -> vars.entrySet().iterator())
+         * @param resultType <pre><code>new TypeLiteral&lt;Map&lt;String, Object>>() { }</code></pre>
+         * @return <pre><code>List&lt;TypeLiteral&lt;Map&lt;String, Object>>() { }></code></pre>
+         */
+        public <T> List<T> evalBatch(
+                Iterable<String> varNames,
+                Iterable<? extends Iterator<? extends Map.Entry<String, ?>>> varsBatch,
+                TypeLiteral<T> resultType
+        ) {
+            final StringBuilder finalScriptBuilder = new StringBuilder();
+            finalScriptBuilder.append(functionsHelper);
+            finalScriptBuilder.append("\nconst var_names = [...varNames];\n");
+            finalScriptBuilder.append("function func(");
+            for (String varName : varNames) {
+                finalScriptBuilder.append(varName);
+                finalScriptBuilder.append(", ");
+            }
+            finalScriptBuilder.append(") { ");
+            if (script != null) {
+                finalScriptBuilder.append(script);
+            }
+            finalScriptBuilder.append("; return ");
+            finalScriptBuilder.append(result.trim());
+            finalScriptBuilder.append("; }\n");
+            finalScriptBuilder.append("const results = [];\n");
+            finalScriptBuilder.append("for (const vars of varsBatch) { results.push(func.apply(null, var_names.map(n => vars[n]))) }\n");
+            finalScriptBuilder.append("results;");
+            final String finalScript = finalScriptBuilder.toString();
+
+            final Map<String, Object> vars = new HashMap<>();
+            vars.put("varNames", varNames);
+            final List<Map<String, Object>> varsBatchConverted = StreamSupport.stream(varsBatch.spliterator(), false).map(entries -> {
+                final Map<String, Object> var = new HashMap<>();
+                while (entries.hasNext()) {
+                    final Map.Entry<String, ?> entry = entries.next();
+                    var.put(entry.getKey(), JavaScript.toJsObject(entry.getValue()));
+                }
+                return var;
+            }).collect(Collectors.toList());
+            vars.put("varsBatch",  varsBatchConverted);
+
+            final Source source = Source.create("js", finalScript);
+            return new Prepared(source).eval(vars.entrySet().iterator(), v -> {
+                final List<Value> results = v.as(new TypeLiteral<List<Value>>() { });
+                return results.stream().map(r -> {
+                    T res = r.as(resultType);
+                    if (res instanceof List) {
+                        //noinspection unchecked
+                        res = (T) new ArrayList<>((List<?>) res);
+                    }
+                    if (res instanceof Map) {
+                        //noinspection unchecked
+                        res = (T) new HashMap<>((Map<?, ?>) res);
+                    }
+                    return res;
+                }).collect(Collectors.toList());
+            });
+        }
     }
 
     public class Prepared {
@@ -128,19 +202,7 @@ public class JavaScript {
                 final Map.Entry<String, ?> entry = vars.next();
                 final String key = entry.getKey();
                 Object value = entry.getValue();
-                if (value instanceof Ref<?>) {
-                    value = ((Ref<?>) value).getValue();
-                } else if (value instanceof BigDecimal) {
-                    final BigDecimal bigDecimal = (BigDecimal) value;
-                    if (bigDecimal.compareTo(maxLongValueBigDecimalView) < 0) {
-                        value = bigDecimal.doubleValue();
-                    }
-                } else if (value instanceof BigInteger) {
-                    final BigInteger bigInteger = (BigInteger) value;
-                    if (bigInteger.compareTo(maxLongValueBigIntegerView) < 0) {
-                        value = bigInteger.longValue();
-                    }
-                }
+                value = JavaScript.toJsObject(value);
                 bindings.putMember(key, value);
             }
         }
@@ -168,12 +230,37 @@ public class JavaScript {
         }
     }
 
+    private static Object toJsObject(Object value) {
+        if (value instanceof Ref<?>) {
+            value = ((Ref<?>) value).getValue();
+        } else if (value instanceof BigDecimal) {
+            final BigDecimal bigDecimal = (BigDecimal) value;
+            if (bigDecimal.compareTo(maxLongValueBigDecimalView) < 0) {
+                value = bigDecimal.doubleValue();
+            }
+        } else if (value instanceof BigInteger) {
+            final BigInteger bigInteger = (BigInteger) value;
+            if (bigInteger.compareTo(maxLongValueBigIntegerView) < 0) {
+                value = bigInteger.longValue();
+            }
+        }
+        return value;
+    }
+
     public Prepared of(String script) {
         return prepare(script, false);
     }
 
     public Prepared compile(String script) {
         return prepare(script, true);
+    }
+
+    /**
+     * @param script 计算过程
+     * @param result 返回结果表达式，必须为一个表达式
+     */
+    public PreparedBatch ofBatch(@Nullable String script, @NotNull String result) {
+        return new PreparedBatch(script, result);
     }
 
     private Prepared prepare(String script, Boolean cache) {

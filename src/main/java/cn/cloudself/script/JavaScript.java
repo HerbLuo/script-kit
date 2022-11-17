@@ -152,8 +152,16 @@ public class JavaScript {
             return eval(Collections.emptyIterator(), this::toJavaObject);
         }
 
+        public Object eval(Iterator<? extends Map.Entry<String, ?>> vars) {
+            return eval(vars, this::toJavaObject);
+        }
+
         public <T> T eval(Map<String, ?> vars, Class<T> resultType) {
             return eval(vars.entrySet().iterator(), v -> v.as(resultType));
+        }
+
+        public <T> T eval(Iterator<? extends Map.Entry<String, ?>> vars, Class<T> resultType) {
+            return eval(vars, v ->  v.as(resultType));
         }
 
         /**
@@ -169,7 +177,7 @@ public class JavaScript {
             return eval(vars, v ->  v.as(resultType));
         }
 
-        private <T> T eval(Iterator<? extends Map.Entry<String, ?>> vars, Function<Value, T> resultHandler) {
+        public <T> T eval(Iterator<? extends Map.Entry<String, ?>> vars, Function<Value, T> resultHandler) {
             try (final Context context = builder.build()) {
                 final Value bindings = context.getBindings("js");
                 bindings.putMember(JavaFunctionName, functions);

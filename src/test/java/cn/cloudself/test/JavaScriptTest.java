@@ -9,7 +9,8 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 public class JavaScriptTest {
     @Test
@@ -48,20 +49,74 @@ public class JavaScriptTest {
     }
 
     @Test
-    public void t2() {
-//        final List<?> objects = new ArrayList<String>();
-//        objects.add("");
-//        objects.get(1);
+    public void test2() {
+        final JavaScript.Prepared compiled = JavaScriptUtil.compile("x");
+        final HashMap<String, Object> vars = new HashMap<>();
+        vars.put("o", new HashMap<String, Object>(){{put("o", 6);}});
+        vars.put("x", 66);
+        System.out.println(compiled.eval(vars));
+    }
 
-        final List<String> list = new ArrayList<>();
+    static class Bean {
+        private Integer num1 = 1;
+        private Long num2 = 2L;
+        private Boolean bool1 = true;
+        private boolean bool2 = false;
+        private Date date = new Date();
+        private List<Integer> nums = new ArrayList<>();
 
-        ((List) list).add(1);
+        public Long getNum2() {
+            return num2;
+        }
 
-        System.out.println(list);
+        public Bean setNum2(Long num2) {
+            this.num2 = num2;
+            return this;
+        }
 
-        final Object s = list.get(0);
-        System.out.println(s);
+        public Boolean getBool1() {
+            return bool1;
+        }
 
+        public Bean setBool1(Boolean bool1) {
+            this.bool1 = bool1;
+            return this;
+        }
 
+        public boolean isBool2() {
+            return bool2;
+        }
+
+        public Bean setBool2(boolean bool2) {
+            this.bool2 = bool2;
+            return this;
+        }
+
+        public Date getDate() {
+            return date;
+        }
+
+        public Bean setDate(Date date) {
+            this.date = date;
+            return this;
+        }
+
+        public List<Integer> getNums() {
+            return nums;
+        }
+
+        public Bean setNums(List<Integer> nums) {
+            this.nums = nums;
+            return this;
+        }
+
+        public Integer getNum1() {
+            return num1;
+        }
+
+        public Bean setNum1(Integer num1) {
+            this.num1 = num1;
+            return this;
+        }
     }
 }

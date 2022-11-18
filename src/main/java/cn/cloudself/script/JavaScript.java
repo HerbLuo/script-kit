@@ -34,6 +34,7 @@ public class JavaScript {
     private final Context.Builder builder = Context
             .newBuilder()
             .allowAllAccess(true)
+            .option("js.foreign-object-prototype", "true")
             .option("engine.WarnInterpreterOnly", doesRuntimeCompilationSupported + "");
     private final Object functions;
     private final String functionsHelper;

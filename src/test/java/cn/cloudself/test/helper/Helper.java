@@ -1,9 +1,13 @@
 package cn.cloudself.test.helper;
 
+import cn.cloudself.script.JavaScriptUtil;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.core.config.builder.api.*;
 import org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class Helper {
     public static void initLogger() {
@@ -18,5 +22,13 @@ public class Helper {
         builder.add(console);
 
         Configurator.initialize(builder.build());
+    }
+
+    public static Object eval(String script, Object ...args) {
+        final Map<String, Object> vars = new HashMap<>();
+        for (int i = 0; i < args.length; i++) {
+            vars.put("a" + i, args[i]);
+        }
+        return JavaScriptUtil.of(script).eval(vars);
     }
 }

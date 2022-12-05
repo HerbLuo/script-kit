@@ -27,6 +27,11 @@ public class JavaScriptTest {
         System.out.println(res3);
     }
 
+    public void date() {
+
+
+    }
+
     @Test
     public void jsToJava() {
         Helper.initLogger();

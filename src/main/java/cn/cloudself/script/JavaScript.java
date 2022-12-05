@@ -50,11 +50,14 @@ public class JavaScript {
     }
 
     public class PreparedBatch {
-        private final String script;
-        private final String result;
-        private PreparedBatch(String script, String result) {
-            this.script = script;
-            this.result = result;
+        private final String sharedScript;
+        private final String calcStatement;
+        private final String resultExpression;
+
+        private PreparedBatch(String sharedScript, String calcStatement, String resultExpression) {
+            this.sharedScript = sharedScript;
+            this.calcStatement = calcStatement;
+            this.resultExpression = resultExpression;
         }
 
         /**
@@ -72,22 +75,35 @@ public class JavaScript {
         ) {
             final StringBuilder finalScriptBuilder = new StringBuilder();
             finalScriptBuilder.append(functionsHelper);
-            finalScriptBuilder.append("\nconst var_names = [...varNames];\n");
-            finalScriptBuilder.append("function func(");
+            finalScriptBuilder.append("\nconst _var_names = [...varNames];\n");
+            if (sharedScript != null) {
+                final String trimmedSharedScript = sharedScript.trim();
+                finalScriptBuilder.append(trimmedSharedScript);
+                if (!trimmedSharedScript.endsWith(";")) {
+                    finalScriptBuilder.append(';');
+                }
+                finalScriptBuilder.append('\n');
+            }
+            finalScriptBuilder.append("function _calc(");
             for (String varName : varNames) {
                 finalScriptBuilder.append(varName);
                 finalScriptBuilder.append(", ");
             }
             finalScriptBuilder.append(") { ");
-            if (script != null) {
-                finalScriptBuilder.append(script);
+            if (calcStatement != null) {
+                final String trimmedCalcStatement = calcStatement.trim();
+                finalScriptBuilder.append(trimmedCalcStatement);
+                if (!trimmedCalcStatement.endsWith(";")) {
+                    finalScriptBuilder.append(';');
+                }
+                finalScriptBuilder.append('\n');
             }
-            finalScriptBuilder.append("; return ");
-            finalScriptBuilder.append(result.trim());
-            finalScriptBuilder.append("; }\n");
-            finalScriptBuilder.append("const results = [];\n");
-            finalScriptBuilder.append("for (const vars of varsBatch) { results.push(func.apply(null, var_names.map(n => vars[n]))) }\n");
-            finalScriptBuilder.append("results;");
+            finalScriptBuilder.append("\nreturn ");
+            finalScriptBuilder.append(resultExpression.trim());
+            finalScriptBuilder.append(";\n}\n");
+            finalScriptBuilder.append("const _results = [];\n");
+            finalScriptBuilder.append("for (const vars of varsBatch) { _results.push(_calc.apply(null, _var_names.map(n => vars[n]))) }\n");
+            finalScriptBuilder.append("_results;");
             final String finalScript = finalScriptBuilder.toString();
 
             final Map<String, Object> vars = new HashMap<>();
@@ -265,11 +281,27 @@ public class JavaScript {
     }
 
     /**
-     * @param script 计算过程
-     * @param result 返回结果表达式，必须为一个表达式
+     * @param resultExpression 返回结果表达式，必须为一个表达式
      */
-    public PreparedBatch ofBatch(@Nullable String script, @NotNull String result) {
-        return new PreparedBatch(script, result);
+    public PreparedBatch ofBatch(@NotNull String resultExpression) {
+        return new PreparedBatch(null, null, resultExpression);
+    }
+
+    /**
+     * @param sharedScript 共用代码
+     * @param resultExpression 返回结果表达式，必须为一个表达式
+     */
+    public PreparedBatch ofBatch(@Nullable String sharedScript, @NotNull String resultExpression) {
+        return new PreparedBatch(sharedScript, null, resultExpression);
+    }
+
+    /**
+     * @param sharedScript 共用代码
+     * @param calcStatement 计算语句
+     * @param resultExpression 返回结果表达式，必须为一个表达式
+     */
+    public PreparedBatch ofBatch(@Nullable String sharedScript, @NotNull String calcStatement, @NotNull String resultExpression) {
+        return new PreparedBatch(sharedScript, calcStatement, resultExpression);
     }
 
     private Prepared prepare(String script, Boolean cache) {

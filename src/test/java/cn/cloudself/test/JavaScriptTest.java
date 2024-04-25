@@ -4,9 +4,11 @@ import cn.cloudself.script.JavaScript;
 import cn.cloudself.script.JavaScriptUtil;
 import cn.cloudself.test.helper.Helper;
 import org.graalvm.polyglot.TypeLiteral;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,14 +19,9 @@ public class JavaScriptTest {
     public void javaToJs() {
         Helper.initLogger();
 
-        final Object res1 = JavaScriptUtil.of("v + 8;").eval(Collections.singletonMap("v", new BigDecimal(100L)));
+        final Object res1 = JavaScriptUtil.of("v + 8;").eval(Collections.singletonMap("v", new BigDecimal(100L)), Double.class);
         assertInstanceOf(Number.class, res1);
         assertEquals(Double.valueOf("108"), Double.valueOf(res1 + ""));
-
-        final Object res2 = JavaScriptUtil.of("NaN + 8000;").eval(new HashMap<>());
-        System.out.println(res2.getClass());
-        final Object res3 = JavaScriptUtil.of("null + NaN + v;").eval(Collections.singletonMap("v", new BigDecimal(100L)));
-        System.out.println(res3);
     }
 
     public void date() {
@@ -36,9 +33,25 @@ public class JavaScriptTest {
     public void jsToJava() {
         Helper.initLogger();
 
-        final Map<String, Object> res1 = JavaScriptUtil.of("{a: 1, 1: 2}").eval(new HashMap<>(), new TypeLiteral<Map<String, Object>>() { });
+        final Map<String, Object> res1 = JavaScriptUtil.of("{a: 1, 1: 2, b: {c: 3, d: new Date(), e: [1, new Date(), {f: 2, g: true}]}}").evalAsMap(new HashMap<>());
         assertEquals("1", res1.get("a").toString());
-        final List<Object> res2 = JavaScriptUtil.of("[2, 2]").eval(new HashMap<>(), new TypeLiteral<List<Object>>() { });
+        final Object bo = res1.get("b");
+        assertInstanceOf(Map.class, bo);
+        final Map<?, ?> b = (Map<?, ?>)  bo;
+        assertEquals(3, b.get("c"));
+        assertInstanceOf(LocalDateTime.class, b.get("d"));
+        final Object eo = b.get("e");
+        assertInstanceOf(List.class, eo);
+        final List<?> e = (List<?>) eo;
+        assertEquals(e.get(0), 1);
+        assertInstanceOf(LocalDateTime.class, e.get(1));
+        final Object e3o = e.get(2);
+        assertInstanceOf(Map.class, e3o);
+        final Map<?, ?> e3 = (Map<?, ?>) e3o;
+        assertEquals(e3.get("f"), 2);
+        assertEquals(e3.get("g"), true);
+
+        final List<Object> res2 = JavaScriptUtil.of("[2, 2, new Date(), {a: 1}]").eval(new HashMap<>(), new TypeLiteral<List<Object>>() { });
         assertEquals("2", res2.get(0).toString());
 
         final Object[] res3 = JavaScriptUtil.of("[3, 2]").eval(new HashMap<>(), new TypeLiteral<Object[]>() { });
@@ -50,7 +63,7 @@ public class JavaScriptTest {
         final JavaScript.Prepared compiled = JavaScriptUtil.compile("const year = date.getFullYear(); print(year);");
         final HashMap<String, Object> vars = new HashMap<>();
         vars.put("date", new Date());
-        System.out.println(compiled.eval(vars));
+        System.out.println(compiled.eval(vars, Object.class));
     }
 
     @Test
@@ -59,7 +72,7 @@ public class JavaScriptTest {
         final HashMap<String, Object> vars = new HashMap<>();
         vars.put("o", new HashMap<String, Object>(){{put("o", 6);}});
         vars.put("x", 66);
-        System.out.println(compiled.eval(vars));
+        System.out.println(compiled.eval(vars, Object.class));
     }
 
     static class Bean {

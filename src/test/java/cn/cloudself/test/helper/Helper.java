@@ -29,6 +29,6 @@ public class Helper {
         for (int i = 0; i < args.length; i++) {
             vars.put("a" + i, args[i]);
         }
-        return JavaScriptUtil.of(script).eval(vars);
+        return JavaScriptUtil.of(script).eval(vars, Object.class);
     }
 }
